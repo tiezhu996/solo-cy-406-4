@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { instanceDb } from '../api/db';
 import { ContractInstance, VariableValues } from '../types/contract-instance';
 import { ContractStatus } from '../types/enums';
+import { TemplatePublication } from '../types/publication';
 import { Template } from '../types/template';
 import { makeId, nowIso, putRecord } from '../utils/db';
 import { seedInstances } from '../utils/seed';
@@ -12,6 +13,7 @@ interface InstanceState {
   loading: boolean;
   loadInstances: () => Promise<void>;
   createFromTemplate: (template: Template) => Promise<ContractInstance>;
+  createFromPublication: (publication: TemplatePublication) => Promise<ContractInstance>;
   updateInstance: (instance: ContractInstance) => Promise<void>;
   deleteInstance: (id: string) => Promise<void>;
   setInstanceStatus: (id: string, status: ContractStatus) => Promise<void>;
@@ -26,8 +28,8 @@ function upsertInstance(list: ContractInstance[], instance: ContractInstance) {
   return sortInstances(exists ? list.map((item) => (item.id === instance.id ? instance : item)) : [instance, ...list]);
 }
 
-function valuesFromTemplate(template: Template): VariableValues {
-  return template.variables.reduce<VariableValues>((acc, variable) => {
+function valuesFromVariables(variables: Template['variables']): VariableValues {
+  return variables.reduce<VariableValues>((acc, variable) => {
     acc[variable.name] = variable.defaultValue;
     return acc;
   }, {});
@@ -53,7 +55,7 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
 
   async createFromTemplate(template) {
     const timestamp = nowIso();
-    const variableValues = valuesFromTemplate(template);
+    const variableValues = valuesFromVariables(template.variables);
     const instance: ContractInstance = {
       id: makeId('inst'),
       templateId: template.id,
@@ -62,6 +64,28 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
       finalHtml: replaceVariables(template, variableValues),
       status: ContractStatus.Draft,
       versionIds: [],
+      createdAt: timestamp,
+      updatedAt: timestamp
+    };
+
+    await instanceDb.save(instance);
+    set((state) => ({ instances: upsertInstance(state.instances, instance) }));
+    return instance;
+  },
+
+  async createFromPublication(publication) {
+    const timestamp = nowIso();
+    const variableValues = valuesFromVariables(publication.variables);
+    const instance: ContractInstance = {
+      id: makeId('inst'),
+      templateId: publication.templateId,
+      title: `${publication.title} - 合同实例`,
+      variableValues,
+      finalHtml: replaceVariables(publication, variableValues),
+      status: ContractStatus.Draft,
+      versionIds: [],
+      publicationId: publication.id,
+      publishedVersionNo: publication.versionNo,
       createdAt: timestamp,
       updatedAt: timestamp
     };

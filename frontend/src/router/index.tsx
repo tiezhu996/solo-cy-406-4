@@ -2,6 +2,7 @@ import { Layout, Menu, Typography } from '@arco-design/web-react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { ClauseList } from '../pages/ClauseList';
 import { InstanceEditor } from '../pages/InstanceEditor';
+import { PublicationHistory } from '../pages/PublicationHistory';
 import { TemplateEditor } from '../pages/TemplateEditor';
 import { TemplateList } from '../pages/TemplateList';
 import { VersionCompare } from '../pages/VersionCompare';
@@ -38,6 +39,7 @@ export function AppRouter() {
             <Route path="/" element={<Navigate to="/templates" replace />} />
             <Route path="/templates" element={<TemplateList />} />
             <Route path="/templates/:id/edit" element={<TemplateEditor />} />
+            <Route path="/templates/:id/publications" element={<PublicationHistory />} />
             <Route path="/instances/:id" element={<InstanceEditor />} />
             <Route path="/instances/:id/versions" element={<VersionCompare />} />
             <Route path="/clauses" element={<ClauseList />} />

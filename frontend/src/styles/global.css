@@ -410,3 +410,51 @@ body {
     padding: 18px;
   }
 }
+
+/* ===== 条款引用块：编辑器中高亮，已发布内容正常排版 ===== */
+.rich-editor__content .clause-ref {
+  margin: 12px 0;
+  padding: 10px 14px;
+  border-left: 3px solid rgb(var(--primary-6));
+  background: rgb(var(--primary-1));
+  border-radius: 4px;
+}
+
+.contract-preview .clause-ref {
+  margin: 14px 0;
+}
+
+.publication-clause {
+  width: 100%;
+  color: var(--ink);
+}
+
+.publication-grid {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.publication-list-card {
+  position: sticky;
+  top: 16px;
+}
+
+.publication-item {
+  border-radius: 6px;
+}
+
+.publication-item--active {
+  background: rgb(var(--primary-1));
+}
+
+.publication-detail-card .arco-list-item {
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .publication-grid {
+    grid-template-columns: 1fr;
+  }
+}

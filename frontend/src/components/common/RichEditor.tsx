@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import Placeholder from '@tiptap/extension-placeholder';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import { ClauseRef } from '../editor/clauseRefNode';
 import { EditorToolbar } from '../editor/EditorToolbar';
 
 interface RichEditorProps {
@@ -28,6 +29,7 @@ export function RichEditor({
   const editor = useEditor({
     extensions: [
       StarterKit,
+      ClauseRef,
       Placeholder.configure({
         placeholder
       })

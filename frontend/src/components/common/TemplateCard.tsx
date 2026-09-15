@@ -1,22 +1,41 @@
 import { Button, Card, Popconfirm, Space, Tag, Typography } from '@arco-design/web-react';
-import { IconCopy, IconDelete, IconEdit, IconFile } from '@arco-design/web-react/icon';
+import { IconCopy, IconDelete, IconEdit, IconFile, IconHistory } from '@arco-design/web-react/icon';
 import { Template } from '../../types/template';
 import { TEMPLATE_CATEGORY_LABELS } from '../../types/enums';
 
 interface TemplateCardProps {
   template: Template;
+  latestPublicationNo?: number;
   onEdit?: (template: Template) => void;
   onDuplicate?: (template: Template) => void;
   onDelete?: (template: Template) => void;
   onCreateInstance?: (template: Template) => void;
+  onViewPublications?: (template: Template) => void;
 }
 
-export function TemplateCard({ template, onEdit, onDuplicate, onDelete, onCreateInstance }: TemplateCardProps) {
+export function TemplateCard({
+  template,
+  latestPublicationNo,
+  onEdit,
+  onDuplicate,
+  onDelete,
+  onCreateInstance,
+  onViewPublications
+}: TemplateCardProps) {
   return (
     <Card className="template-card" hoverable>
       <div className="template-card__header">
         <div>
-          <Typography.Title heading={6}>{template.title}</Typography.Title>
+          <Space size={6}>
+            <Typography.Title heading={6} style={{ margin: 0 }}>
+              {template.title}
+            </Typography.Title>
+            {latestPublicationNo !== undefined && (
+              <Tag size="small" color="green">
+                已发布 v{latestPublicationNo}
+              </Tag>
+            )}
+          </Space>
           <span className="muted">更新于 {new Date(template.updatedAt).toLocaleString()}</span>
         </div>
         <Tag color="arcoblue">{TEMPLATE_CATEGORY_LABELS[template.category]}</Tag>
@@ -38,7 +57,12 @@ export function TemplateCard({ template, onEdit, onDuplicate, onDelete, onCreate
       <div className="card-actions">
         {onCreateInstance && (
           <Button icon={<IconFile />} type="primary" onClick={() => onCreateInstance(template)}>
-            创建实例
+            {latestPublicationNo !== undefined ? '基于最新发布创建' : '创建实例'}
+          </Button>
+        )}
+        {onViewPublications && (
+          <Button icon={<IconHistory />} onClick={() => onViewPublications(template)}>
+            发布记录
           </Button>
         )}
         {onEdit && (

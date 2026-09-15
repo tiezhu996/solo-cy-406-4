@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { CategoryFilter, TemplateCard } from '../components/common';
 import { useClauseStore } from '../stores/clause';
 import { useInstanceStore } from '../stores/instance';
+import { usePublicationStore } from '../stores/publication';
 import { useTemplateStore } from '../stores/template';
 import { TemplateCategory, TEMPLATE_CATEGORY_LABELS } from '../types/enums';
 import { ExportPayload, exportAllData, importAllData } from '../utils/db';
@@ -16,12 +17,25 @@ export function TemplateList() {
   const [keyword, setKeyword] = useState('');
   const [category, setCategory] = useState('all');
   const { templates, loadTemplates, createTemplate, duplicateTemplate, deleteTemplate } = useTemplateStore();
-  const { createFromTemplate, loadInstances } = useInstanceStore();
+  const { createFromTemplate, createFromPublication, loadInstances } = useInstanceStore();
   const { loadClauses } = useClauseStore();
+  const { publications, loadPublications } = usePublicationStore();
 
   useEffect(() => {
-    void Promise.all([loadTemplates(), loadInstances(), loadClauses()]);
-  }, [loadClauses, loadInstances, loadTemplates]);
+    void Promise.all([loadTemplates(), loadInstances(), loadClauses(), loadPublications()]);
+  }, [loadClauses, loadInstances, loadPublications, loadTemplates]);
+
+  // 每个模板的最新发布版本号与发布对象（仅取版本号最大者）
+  const latestByTemplate = useMemo(() => {
+    const map = new Map<string, (typeof publications)[number]>();
+    for (const pub of publications) {
+      const current = map.get(pub.templateId);
+      if (!current || pub.versionNo > current.versionNo) {
+        map.set(pub.templateId, pub);
+      }
+    }
+    return map;
+  }, [publications]);
 
   const categoryOptions = Object.values(TemplateCategory).map((value) => ({
     value,
@@ -52,7 +66,11 @@ export function TemplateList() {
       return;
     }
 
-    const instance = await createFromTemplate(template);
+    // 有发布版时基于最新发布快照创建（读取最新冻结条款）；否则回退到实时草稿
+    const latest = latestByTemplate.get(templateId);
+    const instance = latest
+      ? await createFromPublication(latest)
+      : await createFromTemplate(template);
     navigate(`/instances/${instance.id}`);
   };
 
@@ -117,10 +135,12 @@ export function TemplateList() {
           <TemplateCard
             key={template.id}
             template={template}
+            latestPublicationNo={latestByTemplate.get(template.id)?.versionNo}
             onEdit={() => navigate(`/templates/${template.id}/edit`)}
             onDuplicate={() => void duplicateTemplate(template.id)}
             onDelete={() => void deleteTemplate(template.id)}
             onCreateInstance={() => void createInstance(template.id)}
+            onViewPublications={() => navigate(`/templates/${template.id}/publications`)}
           />
         ))}
       </div>

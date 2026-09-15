@@ -1,15 +1,17 @@
 import { Button, Input, Message, Select, Space, Typography } from '@arco-design/web-react';
-import { IconBook, IconSave } from '@arco-design/web-react/icon';
+import { IconBook, IconHistory, IconSend, IconSave } from '@arco-design/web-react/icon';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { RichEditor } from '../components/common';
 import { ClauseDrawer } from '../components/editor/ClauseDrawer';
+import { PublishDialog } from '../components/editor/PublishDialog';
 import { VariablePanel } from '../components/editor/VariablePanel';
 import { useHistory } from '../hooks/useHistory';
 import { useClauseStore } from '../stores/clause';
 import { useTemplateStore } from '../stores/template';
 import { TemplateCategory, TEMPLATE_CATEGORY_LABELS } from '../types/enums';
 import { Template } from '../types/template';
+import { buildClauseRefHtml } from '../utils/publication';
 
 const categoryOptions = Object.values(TemplateCategory).map((value) => ({
   label: TEMPLATE_CATEGORY_LABELS[value],
@@ -19,8 +21,9 @@ const categoryOptions = Object.values(TemplateCategory).map((value) => ({
 export function TemplateEditor() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [draft, setDraft] = useState<Template | undefined>();
+  const [draft, setDraft] = useState<Template>();
   const [clauseDrawerVisible, setClauseDrawerVisible] = useState(false);
+  const [publishVisible, setPublishVisible] = useState(false);
   const contentHistory = useHistory('');
   const { templates, loadTemplates, createTemplate, updateTemplate } = useTemplateStore();
   const { clauses, loadClauses, incrementUsage } = useClauseStore();
@@ -98,6 +101,12 @@ export function TemplateEditor() {
     Message.success('模板已保存');
   };
 
+  const openPublish = async () => {
+    // 发布前先持久化当前草稿，保证模板与即将冻结的快照一致
+    await updateTemplate(draft);
+    setPublishVisible(true);
+  };
+
   return (
     <section className="page-section editor-page">
       <div className="page-heading">
@@ -109,8 +118,14 @@ export function TemplateEditor() {
           <Button icon={<IconBook />} onClick={() => setClauseDrawerVisible(true)}>
             条款库
           </Button>
+          <Button icon={<IconHistory />} onClick={() => navigate(`/templates/${draft.id}/publications`)}>
+            发布历史
+          </Button>
           <Button type="primary" icon={<IconSave />} onClick={() => void saveTemplate()}>
             保存
+          </Button>
+          <Button type="outline" status="success" icon={<IconSend />} onClick={() => void openPublish()}>
+            发布
           </Button>
         </Space>
       </div>
@@ -155,9 +170,21 @@ export function TemplateEditor() {
         clauses={clauses}
         onClose={() => setClauseDrawerVisible(false)}
         onInsert={(clause) => {
-          insertHtml(clause.contentHtml);
+          insertHtml(buildClauseRefHtml(clause));
           void incrementUsage(clause.id);
-          Message.success('条款已插入正文末尾');
+          Message.success('条款已作为引用块插入正文末尾');
+        }}
+      />
+
+      <PublishDialog
+        visible={publishVisible}
+        template={draft}
+        clauses={clauses}
+        onClose={() => setPublishVisible(false)}
+        onPublished={(publication) => {
+          setPublishVisible(false);
+          Message.success(`已发布 v${publication.versionNo}`);
+          navigate(`/templates/${draft.id}/publications`);
         }}
       />
     </section>
