@@ -57,6 +57,41 @@ export function hasBlockingIssues(issues: PublicationIssue[]): boolean {
 }
 
 /**
+ * 发布新版本前，把正文引用块刷新为条款库最新内容并重算 hash。
+ * 仅刷新仍存在的条款；已删除的引用保持原样，交由 validatePublication 拦截。
+ * 这样新版本固化的是最新条款，而已发布旧快照的 contentHtml 不会被触碰。
+ */
+export function refreshClauseRefs(html: string, clausesById: Map<string, Clause>): string {
+  if (typeof DOMParser === 'undefined') {
+    return html;
+  }
+
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const sections = Array.from(doc.querySelectorAll('section[data-clause-ref]'));
+  if (!sections.length) {
+    return html;
+  }
+
+  let changed = false;
+  for (const section of sections) {
+    const clauseId = section.getAttribute('data-clause-ref') ?? '';
+    const clause = clausesById.get(clauseId);
+    if (!clause) {
+      continue;
+    }
+
+    const latestHash = hashHtml(clause.contentHtml);
+    if (section.getAttribute('data-clause-hash') !== latestHash || section.innerHTML !== clause.contentHtml) {
+      section.innerHTML = clause.contentHtml;
+      section.setAttribute('data-clause-hash', latestHash);
+      changed = true;
+    }
+  }
+
+  return changed ? doc.body.innerHTML : html;
+}
+
+/**
  * 发布前检查：
  * - error：未替换占位符、必填变量无默认值、变量名重复、引用条款已删除（失效）
  * - warning：声明但未使用的变量、引用条款内容已更新
@@ -127,7 +162,7 @@ export function validatePublication(source: PublicationSource, clausesById: Map<
       push('warning', {
         code: 'CLAUSE_STALE',
         clauseId: clause.id,
-        message: `条款「${clause.title}」在插入后已被修改，发布将固化当前正文版本。`
+        message: `条款「${clause.title}」在插入后已被修改，发布时将自动采用条款库最新内容。`
       });
     }
   }

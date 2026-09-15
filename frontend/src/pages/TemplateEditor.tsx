@@ -1,8 +1,8 @@
 import { Button, Input, Message, Select, Space, Typography } from '@arco-design/web-react';
 import { IconBook, IconHistory, IconSend, IconSave } from '@arco-design/web-react/icon';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { RichEditor } from '../components/common';
+import { RichEditor, RichEditorHandle } from '../components/common';
 import { ClauseDrawer } from '../components/editor/ClauseDrawer';
 import { PublishDialog } from '../components/editor/PublishDialog';
 import { VariablePanel } from '../components/editor/VariablePanel';
@@ -25,6 +25,9 @@ export function TemplateEditor() {
   const [clauseDrawerVisible, setClauseDrawerVisible] = useState(false);
   const [publishVisible, setPublishVisible] = useState(false);
   const contentHistory = useHistory('');
+  const richEditorRef = useRef<RichEditorHandle>(null);
+  // 记录最近一次从 store 回填的模板 updatedAt，避免每次渲染都把本地草稿覆盖回已保存版本
+  const hydratedUpdatedAtRef = useRef('');
   const { templates, loadTemplates, createTemplate, updateTemplate } = useTemplateStore();
   const { clauses, loadClauses, incrementUsage } = useClauseStore();
 
@@ -32,25 +35,33 @@ export function TemplateEditor() {
     void Promise.all([loadTemplates(), loadClauses()]);
   }, [loadClauses, loadTemplates]);
 
+  // 新建模板（仅在 id === 'new' 时触发一次）
   useEffect(() => {
-    if (!id) {
-      return;
-    }
-
     if (id === 'new') {
       void createTemplate().then((template) => navigate(`/templates/${template.id}/edit`, { replace: true }));
+    }
+  }, [createTemplate, id, navigate]);
+
+  // 仅在以下情况把 store 记录回填到本地草稿：首次加载到该模板、保存后、发布刷新条款后。
+  // 编辑过程中 templates 引用变化但 updatedAt 未变时不回填，避免覆盖未保存的引用块。
+  useEffect(() => {
+    if (!id || id === 'new') {
       return;
     }
 
     const found = templates.find((template) => template.id === id);
-    if (found) {
+    if (found && found.updatedAt !== hydratedUpdatedAtRef.current) {
+      hydratedUpdatedAtRef.current = found.updatedAt;
       setDraft(found);
       contentHistory.reset(found.contentHtml);
     }
-  }, [contentHistory, createTemplate, id, navigate, templates]);
+  }, [id, templates, contentHistory.reset]);
 
+  // 外部撤销/重做（历史栈变化）同步回正文
   useEffect(() => {
-    setDraft((current) => (current && current.contentHtml !== contentHistory.value ? { ...current, contentHtml: contentHistory.value } : current));
+    setDraft((current) =>
+      current && current.contentHtml !== contentHistory.value ? { ...current, contentHtml: contentHistory.value } : current
+    );
   }, [contentHistory.value]);
 
   useEffect(() => {
@@ -92,8 +103,9 @@ export function TemplateEditor() {
   };
 
   const insertHtml = (html: string) => {
-    const nextContent = `${draft.contentHtml}${html}`;
-    updateContent(nextContent);
+    // 交给编辑器以事务插入，确保 clauseRef 自定义节点被正确解析并保留；
+    // onChange 会同步回 draft 与历史栈
+    richEditorRef.current?.insertHtml(html);
   };
 
   const saveTemplate = async () => {
@@ -149,6 +161,7 @@ export function TemplateEditor() {
 
       <div className="editor-grid">
         <RichEditor
+          ref={richEditorRef}
           value={draft.contentHtml}
           onChange={updateContent}
           placeholder="编辑合同模板正文..."

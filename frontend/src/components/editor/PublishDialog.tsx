@@ -94,7 +94,7 @@ export function PublishDialog({ visible, template, clauses, onClose, onPublished
           />
         )}
         {!blocked && warnings.length > 0 && (
-          <Alert type="warning" content={`有 ${warnings.length} 个警告，可继续发布（发布将固化当前正文版本）。`} />
+          <Alert type="warning" content={`有 ${warnings.length} 个警告，可继续发布；引用条款将自动刷新为条款库最新内容。`} />
         )}
         {!issues.length && (
           <Alert type="success" icon={<IconCheckCircleFill />} content="检查通过，可以发布。" />
