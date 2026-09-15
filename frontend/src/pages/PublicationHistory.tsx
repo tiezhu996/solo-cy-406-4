@@ -1,4 +1,4 @@
-import { Button, Card, Empty, List, Message, Space, Spin, Tag, Typography } from '@arco-design/web-react';
+import { Alert, Button, Card, Empty, List, Message, Space, Spin, Tag, Typography } from '@arco-design/web-react';
 import { IconLeft, IconFile } from '@arco-design/web-react/icon';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -19,7 +19,7 @@ function formatPublishedAt(value: string) {
 export function PublicationHistory() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { publications, loading, loadPublications } = usePublicationStore();
+  const { publications, loading, loadError, loadPublications } = usePublicationStore();
   const { createFromPublication } = useInstanceStore();
   const [selectedId, setSelectedId] = useState<string>();
 
@@ -47,6 +47,10 @@ export function PublicationHistory() {
     navigate(`/instances/${instance.id}`);
   };
 
+  const retryLoad = () => {
+    void loadPublications();
+  };
+
   return (
     <section className="page-section">
       <div className="page-heading">
@@ -60,7 +64,18 @@ export function PublicationHistory() {
       </div>
 
       <Spin loading={loading} style={{ display: 'block' }}>
-        {!related.length ? (
+        {loadError ? (
+          <Alert
+            type="error"
+            title="无法打开版本历史"
+            content={loadError}
+            action={
+              <Button size="small" type="primary" onClick={retryLoad}>
+                重试
+              </Button>
+            }
+          />
+        ) : !related.length ? (
           <Empty description="该模板还没有发布过版本，发布后会在此生成不可变快照。" />
         ) : (
           <div className="publication-grid">

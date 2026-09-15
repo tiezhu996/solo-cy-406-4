@@ -23,6 +23,7 @@ interface PublishResult {
 interface PublicationState {
   publications: TemplatePublication[];
   loading: boolean;
+  loadError: string | null;
   loadPublications: () => Promise<void>;
   /** 发布前检查；存在 error 时拦截，不写入任何新快照。通过后先刷新引用条款到最新，再冻结 */
   publishTemplate: (template: Template, clauses: Clause[], remark?: string) => Promise<PublishResult>;
@@ -36,14 +37,21 @@ function sortPublications(publications: TemplatePublication[]) {
 export const usePublicationStore = create<PublicationState>((set, get) => ({
   publications: [],
   loading: false,
+  loadError: null,
 
   async loadPublications() {
-    set({ loading: true });
+    set({ loading: true, loadError: null });
     try {
       // 规范化后再入内存：兼容旧/残缺数据，保证历史页可回读、顺序确定
       const raw = await publicationDb.list();
       const publications = (raw as Array<Partial<TemplatePublication> & { id: string }>).map(normalizePublication);
-      set({ publications: sortPublications(publications) });
+      set({ publications: sortPublications(publications), loadError: null });
+    } catch (error) {
+      const message =
+        error instanceof Error && error.name === 'BlockedUpgradeError'
+          ? error.message
+          : '读取发布历史失败，请重试。';
+      set({ loadError: message });
     } finally {
       set({ loading: false });
     }
