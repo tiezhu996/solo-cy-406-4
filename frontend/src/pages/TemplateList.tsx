@@ -25,12 +25,12 @@ export function TemplateList() {
     void Promise.all([loadTemplates(), loadInstances(), loadClauses(), loadPublications()]);
   }, [loadClauses, loadInstances, loadPublications, loadTemplates]);
 
-  // 每个模板的最新发布版本号与发布对象（仅取版本号最大者）
+  // 每个模板的最新发布版（publications 已按版本号/时间倒序排好，保留每组第一条，
+  // 即便历史上有相同版本号也只取唯一的“最新”，与发布历史页口径一致）
   const latestByTemplate = useMemo(() => {
     const map = new Map<string, (typeof publications)[number]>();
     for (const pub of publications) {
-      const current = map.get(pub.templateId);
-      if (!current || pub.versionNo > current.versionNo) {
+      if (!map.has(pub.templateId)) {
         map.set(pub.templateId, pub);
       }
     }

@@ -6,6 +6,15 @@ import { useInstanceStore } from '../stores/instance';
 import { usePublicationStore } from '../stores/publication';
 import { CLAUSE_CATEGORY_LABELS } from '../types/enums';
 import { TemplatePublication } from '../types/publication';
+import { comparePublicationsDesc } from '../utils/publication';
+
+function formatPublishedAt(value: string) {
+  if (!value) {
+    return '时间未知';
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '时间未知' : date.toLocaleString();
+}
 
 export function PublicationHistory() {
   const { id } = useParams();
@@ -19,12 +28,13 @@ export function PublicationHistory() {
   }, [loadPublications]);
 
   const related = useMemo(
-    () => publications.filter((item) => item.templateId === id).sort((a, b) => b.versionNo - a.versionNo),
+    () => publications.filter((item) => item.templateId === id).sort(comparePublicationsDesc),
     [id, publications]
   );
 
   useEffect(() => {
-    if (!selectedId && related.length) {
+    // 切换模板或当前选中项已不存在时，默认选中排在最前的一条
+    if (related.length && !related.some((item) => item.id === selectedId)) {
       setSelectedId(related[0].id);
     }
   }, [related, selectedId]);
@@ -67,14 +77,14 @@ export function PublicationHistory() {
                     <Space direction="vertical" size={2}>
                       <Space>
                         <Typography.Text bold>v{item.versionNo}</Typography.Text>
-                        {item.versionNo === related[0].versionNo && (
+                        {item.id === related[0].id && (
                           <Tag size="small" color="green">
                             最新
                           </Tag>
                         )}
                       </Space>
                       <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                        {new Date(item.publishedAt).toLocaleString()}
+                        {formatPublishedAt(item.publishedAt)}
                       </Typography.Text>
                       <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                         {item.remark}
@@ -105,7 +115,8 @@ export function PublicationHistory() {
               >
                 <Space direction="vertical" size={16} style={{ width: '100%' }}>
                   <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                    发布于 {new Date(selected.publishedAt).toLocaleString()} · 校验和 {selected.checksum}
+                    发布于 {formatPublishedAt(selected.publishedAt)}
+                    {selected.checksum ? ` · 校验和 ${selected.checksum}` : ''}
                   </Typography.Text>
 
                   <article

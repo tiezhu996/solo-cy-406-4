@@ -214,3 +214,39 @@ export function buildPublication(
     remark: remark.trim() || `发布版本 ${versionNo}`
   };
 }
+
+/**
+ * 规范化一条已持久化的发布记录：兼容早期/残缺数据，缺字段时补默认值，
+ * 保证版本历史在旧数据上仍能回读、渲染，且不改动正文内容。
+ */
+export function normalizePublication(raw: Partial<TemplatePublication> & { id: string }): TemplatePublication {
+  const versionNo = Number.isFinite(raw.versionNo) ? (raw.versionNo as number) : 0;
+  return {
+    id: raw.id,
+    templateId: raw.templateId ?? '',
+    versionNo,
+    title: raw.title ?? '未命名模板',
+    category: raw.category ?? ('service' as TemplatePublication['category']),
+    contentHtml: raw.contentHtml ?? '',
+    variables: Array.isArray(raw.variables) ? raw.variables : [],
+    clauses: Array.isArray(raw.clauses) ? raw.clauses : [],
+    checksum: raw.checksum ?? '',
+    publishedAt: raw.publishedAt ?? '',
+    remark: raw.remark ?? `发布版本 ${versionNo || '?'}`
+  };
+}
+
+/**
+ * 版本历史的确定性顺序：版本号倒序，同号时按发布时间倒序，再以 id 兜底。
+ * 即便历史上产生过相同版本号，也只有唯一一条排在最前（“最新”），且顺序稳定。
+ */
+export function comparePublicationsDesc(a: TemplatePublication, b: TemplatePublication): number {
+  if (b.versionNo !== a.versionNo) {
+    return b.versionNo - a.versionNo;
+  }
+  const timeCmp = (b.publishedAt || '').localeCompare(a.publishedAt || '');
+  if (timeCmp !== 0) {
+    return timeCmp;
+  }
+  return b.id.localeCompare(a.id);
+}

@@ -50,6 +50,10 @@ export function getDb() {
           }
         }
       }
+    }).catch((error) => {
+      // 升级被阻塞或打开失败时不缓存 rejected promise，允许下次重试，避免数据层永久不可用
+      dbPromise = undefined;
+      throw error;
     });
   }
 

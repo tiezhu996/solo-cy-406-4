@@ -4,7 +4,14 @@ import { Clause } from '../types/clause';
 import { PublicationIssue, TemplatePublication } from '../types/publication';
 import { Template } from '../types/template';
 import { makeId, nowIso } from '../utils/db';
-import { buildPublication, hasBlockingIssues, refreshClauseRefs, validatePublication } from '../utils/publication';
+import {
+  buildPublication,
+  comparePublicationsDesc,
+  hasBlockingIssues,
+  normalizePublication,
+  refreshClauseRefs,
+  validatePublication
+} from '../utils/publication';
 import { useTemplateStore } from './template';
 
 interface PublishResult {
@@ -23,7 +30,7 @@ interface PublicationState {
 }
 
 function sortPublications(publications: TemplatePublication[]) {
-  return [...publications].sort((a, b) => b.versionNo - a.versionNo || b.publishedAt.localeCompare(a.publishedAt));
+  return [...publications].sort(comparePublicationsDesc);
 }
 
 export const usePublicationStore = create<PublicationState>((set, get) => ({
@@ -33,7 +40,9 @@ export const usePublicationStore = create<PublicationState>((set, get) => ({
   async loadPublications() {
     set({ loading: true });
     try {
-      const publications = await publicationDb.list();
+      // 规范化后再入内存：兼容旧/残缺数据，保证历史页可回读、顺序确定
+      const raw = await publicationDb.list();
+      const publications = (raw as Array<Partial<TemplatePublication> & { id: string }>).map(normalizePublication);
       set({ publications: sortPublications(publications) });
     } finally {
       set({ loading: false });
@@ -48,6 +57,14 @@ export const usePublicationStore = create<PublicationState>((set, get) => ({
       return { ok: false, issues };
     }
 
+    // 版本号以“已保存的历史”为准，而不是内存状态：
+    // 编辑页可能从未 loadPublications（重载后内存为空），直接读持久层避免再次编成 v1。
+    const persisted = (await publicationDb.list()) as Array<Partial<TemplatePublication> & { id: string }>;
+    const maxVersionNo = persisted
+      .filter((item) => item.templateId === template.id)
+      .reduce((max, item) => Math.max(max, Number.isFinite(item.versionNo) ? (item.versionNo as number) : 0), 0);
+    const versionNo = maxVersionNo + 1;
+
     // 新版本必须固化条款库最新内容：把正文引用块刷新为最新措辞与 hash。
     // 仅更新当前模板与本次快照；历史发布记录不参与，仍保持各自原措辞。
     const refreshedHtml = refreshClauseRefs(template.contentHtml, clausesById);
@@ -58,8 +75,6 @@ export const usePublicationStore = create<PublicationState>((set, get) => ({
       await useTemplateStore.getState().updateTemplate(refreshedTemplate, false);
     }
 
-    const related = get().publications.filter((item) => item.templateId === template.id);
-    const versionNo = related.reduce((max, item) => Math.max(max, item.versionNo), 0) + 1;
     const draft = buildPublication(refreshedTemplate, template.id, versionNo, remark, clausesById);
     const publication: TemplatePublication = {
       ...draft,
@@ -75,6 +90,6 @@ export const usePublicationStore = create<PublicationState>((set, get) => ({
   getByTemplate(templateId) {
     return get()
       .publications.filter((item) => item.templateId === templateId)
-      .sort((a, b) => b.versionNo - a.versionNo);
+      .sort(comparePublicationsDesc);
   }
 }));
